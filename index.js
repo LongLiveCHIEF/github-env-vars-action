@@ -3,6 +3,49 @@
 const core = require('@actions/core');
 
 /**
+ *  prefixes a given key, or the first variable in a string with 'GITHUB_'.
+ * 
+ *  Interpolates the first variable in the template literal into 'GITHUB_string',
+ *  but evaluates the expression of any remaining variables passed.  Will turn
+ *  var repo_slug = 'REPOSITORY_SLUG'
+ *  var value = 'owner-name-repository-name'
+ *  gh`Set ${repo_slug}=${value}` into 
+ *  'Set GITHUB_REPOSITORY_SLUG=owner-name-repository-name'
+ * 
+ *  @param {array} strings
+ *  @return {array} args
+ */
+function gh(strings, ...values){
+  if (strings.length == 0) {
+    return `GITHUB_${key}`;
+  }
+
+  let str = '';
+  strings.forEach((string, i) => {
+    if(values[i] > 0) {
+       str += string + values[i];
+    } else {
+       str += string + 'GITHUB_' + values[i];
+
+    }
+   });
+  return str;
+}
+
+/**
+ *  Sets an environment variable and output 
+ *  @param {string} key the env var/output name
+ *  @param {string} value the env var/output raw value
+ *  @param {boolean} slugify set to true if value should be slugified 
+ *  @return {string} GITHUB_key
+ */
+function stamp(key, rawValue, slugify=false){
+  let value = slugify ? slugify(rawValue) : rawValue;
+  core.setEnvironment(gh`${key}`, value);
+  core.setOutput(gh`${key}`, value);
+  core.info(gh`Set ${key}=${value}`);
+}
+/**
  * Slugify a given string.
  * @param {string} inputString
  * @return {string} The slugified string.
@@ -57,18 +100,17 @@ try {
   // i.e. FranzDiebold/github-env-vars-action
   repository = process.env.GITHUB_REPOSITORY;
 
+  var repo_slug = 'REPOSITORY_SLUG'
   if (repository) {
-    core.exportVariable('GITHUB_REPOSITORY_SLUG', slugify(repository));
-    core.info(`Set GITHUB_REPOSITORY_SLUG=` +
-              `${process.env.GITHUB_REPOSITORY_SLUG}`);
+    stamp(repo_slug, repository, true)
   } else {
-    core.warning('Environment variable "GITHUB_REPOSITORY" not set. ' +
-                 'Cannot set "GITHUB_REPOSITORY_SLUG".');
+    core.warning(gh`Environment variable ${repo_slug} not set.\nCannot set ${repo_slug}.`)
   }
 
   repositoryOwner = getRepositoryOwner(repository);
   if (repositoryOwner) {
     core.exportVariable('GITHUB_REPOSITORY_OWNER', repositoryOwner);
+    core.setOutput('GITHUB_REPOSITORY_OWNER', repositoryOwner);
     core.info(`Set GITHUB_REPOSITORY_OWNER=` +
               `${process.env.GITHUB_REPOSITORY_OWNER}`);
 
